@@ -1,0 +1,21 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "dadjoke-notifier",
+  "outputfilename": "dadjoke-notifier",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "ullaskunder3",
+    "email": "ullaskunder3@gmail.com"
+  },
+  "windows": {
+    "transparent": true
+  },
+  "mac": {
+    "vibrancy": "sidebar",
+    "transparency": true
+  },
+  "webviewIsTransparent": true
+}
