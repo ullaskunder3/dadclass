@@ -15,10 +15,14 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/getlantern/systray"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed frontend/src/assets/images/32x32.ico
+var trayIcon []byte
 
 const appTitle = "dadclass"
 
@@ -56,6 +60,40 @@ func main() {
 	}
 
 	app := NewApp()
+
+	// ── Setup System Tray (Windows safe) ────────────
+	go systray.Run(func() {
+		systray.SetIcon(trayIcon)
+		systray.SetTitle("dadclass")
+		systray.SetTooltip("dadclass Notifier")
+
+		mShow := systray.AddMenuItem("Show App", "Show the main window")
+		systray.AddSeparator()
+		mQuit := systray.AddMenuItem("Quit", "Exit the application completely")
+
+		for {
+			select {
+			case <-mShow.ClickedCh:
+				ShowInTaskbar(appTitle)
+				if app.ctx != nil {
+					runtime.WindowShow(app.ctx)
+					runtime.WindowUnminimise(app.ctx)
+					runtime.WindowSetAlwaysOnTop(app.ctx, true)
+					runtime.WindowSetAlwaysOnTop(app.ctx, false)
+				}
+			case <-mQuit.ClickedCh:
+				systray.Quit()
+				if app.ctx != nil {
+					app.Quit()
+				} else {
+					os.Exit(0)
+				}
+				return
+			}
+		}
+	}, func() {
+		// onExit
+	})
 
 	// ── Window Menu (since v2 has no system tray) ────────────
 	appMenu := menu.NewMenu()
