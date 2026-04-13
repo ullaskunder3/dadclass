@@ -4,70 +4,100 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App struct
 type App struct {
-	ctx    context.Context
-	ticker *time.Ticker
-	stop   chan bool
+	ctx     context.Context
+	ticker  *time.Ticker
+	stop    chan struct{}
+	running bool
+	mu      sync.Mutex
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		stop: make(chan bool),
+		stop: make(chan struct{}),
 	}
 }
 
-// startup saves the context so we can call runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-
 }
 
 func (a *App) Quit() {
-	// cleanup if needed
-	close(a.stop) // stop ticker, or do other cleanup
+	a.cleanup()
 	runtime.Quit(a.ctx)
 }
 
-// StartNotifications starts sending dad jokes every X seconds
-// StartNotifications starts a ticker to send dad jokes every X seconds
+func (a *App) cleanup() {
+	a.mu.Lock()
+	if a.running {
+		close(a.stop)
+		a.running = false
+	}
+	a.mu.Unlock()
+}
+
+func (a *App) ShowWindow() {
+	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) IsRunning() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.running
+}
+
 func (a *App) StartNotifications(seconds int) {
+	a.mu.Lock()
+	if a.running {
+		close(a.stop)
+		a.running = false
+	}
+	a.stop = make(chan struct{})
+	a.running = true
+	a.mu.Unlock()
+
 	go func() {
 		ticker := time.NewTicker(time.Duration(seconds) * time.Second)
-		a.ticker = ticker
+		defer ticker.Stop()
+
+		joke := a.fetchJoke()
+		if joke != "" {
+			runtime.EventsEmit(a.ctx, "joke", joke)
+		}
 
 		for {
 			select {
 			case <-ticker.C:
-				joke := a.fetchJoke() // <---- changed here
-				runtime.EventsEmit(a.ctx, "joke", joke)
+				joke := a.fetchJoke()
+				if joke != "" {
+					runtime.EventsEmit(a.ctx, "joke", joke)
+				}
 			case <-a.stop:
-				ticker.Stop()
 				return
 			}
 		}
 	}()
 }
 
-// StopNotifications stops the ticker
 func (a *App) StopNotifications() {
-	if a.stop != nil {
-		a.stop <- true
-	}
+	a.cleanup()
 }
 
-// fetchJoke gets a random dad joke from the API
 func (a *App) fetchJoke() string {
-	req, _ := http.NewRequest("GET", "https://icanhazdadjoke.com/", nil)
+	req, err := http.NewRequest("GET", "https://icanhazdadjoke.com/", nil)
+	if err != nil {
+		return ""
+	}
 	req.Header.Set("Accept", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 8 * time.Second}
+	res, err := client.Do(req)
 	if err != nil {
 		return ""
 	}
