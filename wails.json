@@ -17,5 +17,12 @@
     "vibrancy": "sidebar",
     "transparency": true
   },
-  "webviewIsTransparent": true
+  "webviewIsTransparent": true,
+  "Info": {
+    "companyName": "haruXlord",
+    "productName": "DadJoke Notifier",
+    "productVersion": "1.0.0",
+    "copyright": "@ 2025 haruXlord",
+    "comments": "Built with curiosity"
+  }
 }
